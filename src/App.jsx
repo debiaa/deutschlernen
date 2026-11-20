@@ -89,7 +89,7 @@ const extraLessons = [
 const nav = [{id:'home',label:'Beranda',icon:LayoutDashboard},{id:'materi',label:'Materi',icon:BookOpen},{id:'grammar',label:'Grammatik',icon:GraduationCap},{id:'practice',label:'Latihan soal',icon:Trophy},{id:'vocab',label:'Kosakata',icon:Languages},{id:'flashcards',label:'Flashcards',icon:Layers},{id:'listening',label:'Hören',icon:Headphones},{id:'speaking',label:'Sprechen',icon:Mic2},{id:'progress',label:'Progress',icon:ChartNoAxesColumnIncreasing}];
 const readStore=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
 function parseWordCsv(text){
- const lines=text.replace(/^\\uFEFF/,'').split(/\\r?\\n/).filter(x=>x.trim());
+ const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/).filter(x=>x.trim());
  const split=line=>{const out=[];let cell='',quoted=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'&&line[i+1]==='"'&&quoted){cell+='"';i++;}else if(c==='"'){quoted=!quoted;}else if(c===','&&!quoted){out.push(cell.trim());cell='';}else cell+=c;}out.push(cell.trim());return out;};
  const headers=split(lines.shift()).map(x=>x.toLowerCase());
  return lines.map((line,i)=>{const cells=split(line),r={};headers.forEach((h,j)=>r[h]=cells[j]||'');return {id:Date.now()+i,word:r.word,type:/verb/i.test(r.type||'')?'Verben':'Nomen',meaning:r.meaning,plural:r.plural||'',past:r.past||r.perfekt||'',example:r.example||'',chapter:r.chapter||'Import',level:/b1/i.test(r.level||'')?'B1':'A2'};}).filter(w=>w.word?.trim()&&w.meaning?.trim());
