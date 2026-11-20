@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import expandedWords from './data/expandedWords';
+import { grammarTopics, exercises } from './data/course';
 import { LayoutDashboard, BookOpen, Layers, Headphones, Mic2, ChartNoAxesColumnIncreasing, Settings, Search, Bell, Flame, Clock3, ArrowRight, ChevronLeft, ChevronRight, Volume2, Shuffle, Check, X, Bookmark, Play, Pause, Plus, Menu, Sparkles, GraduationCap, CircleHelp, RotateCcw, AudioLines, Languages, Target, Trophy } from 'lucide-react';
 
 const baseSeedWords = [
@@ -85,17 +86,24 @@ const extraLessons = [
  {n:12,title:'Gute Unterhaltung!',subtitle:'Hiburan, festival, musik, seni, media, dan deskripsi karya',goals:['merencanakan kunjungan festival atau konser','membicarakan musik, film, dan karya seni','mendeskripsikan orang, benda, dan karya secara lebih rinci'],grammar:'Relativsatz untuk memberi informasi tambahan: Das ist der Film, den ich gestern gesehen habe. / Das ist die Sängerin, die ich sehr mag. Kata ganti relatif menyesuaikan gender, jumlah, dan kasus.',phrases:[['Welche Musik hörst du am liebsten?','Musik apa yang paling kamu suka dengarkan?'],['Das Bild stellt … dar.','Lukisan itu menggambarkan …'],['Mir gefällt besonders, dass …','Saya terutama suka bahwa …'],['Der Film handelt von …','Film itu bercerita tentang …']],task:'Pilih lagu, film, atau lukisan yang kamu sukai. Deskripsikan isi, suasana, dan alasan kamu merekomendasikannya.'}
 ];
 
-const nav = [{id:'home',label:'Beranda',icon:LayoutDashboard},{id:'materi',label:'Materi',icon:BookOpen},{id:'vocab',label:'Kosakata',icon:BookOpen},{id:'flashcards',label:'Flashcards',icon:Layers},{id:'listening',label:'Hören',icon:Headphones},{id:'speaking',label:'Sprechen',icon:Mic2},{id:'progress',label:'Progress',icon:ChartNoAxesColumnIncreasing}];
+const nav = [{id:'home',label:'Beranda',icon:LayoutDashboard},{id:'materi',label:'Materi',icon:BookOpen},{id:'grammar',label:'Grammatik',icon:GraduationCap},{id:'practice',label:'Latihan soal',icon:Trophy},{id:'vocab',label:'Kosakata',icon:Languages},{id:'flashcards',label:'Flashcards',icon:Layers},{id:'listening',label:'Hören',icon:Headphones},{id:'speaking',label:'Sprechen',icon:Mic2},{id:'progress',label:'Progress',icon:ChartNoAxesColumnIncreasing}];
 const readStore=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
 function LearningApp({ session, initialData }){
  const [page,setPage]=useState('home'),[lessonAnswer,setLessonAnswer]=useState(null),[words,setWords]=useState(()=>{const stored=initialData?.words ?? readStore('dz-words',seedWords);const seen=new Set(stored.map(w=>w.word.toLowerCase()));return [...seedWords.filter(w=>!seen.has(w.word.toLowerCase())),...stored]}),[known,setKnown]=useState(()=>initialData?.known ?? readStore('dz-known',[])),[saved,setSaved]=useState(()=>initialData?.saved ?? readStore('dz-saved',[])),[streak]=useState(4);
  const [filter,setFilter]=useState('Semua'),[type,setType]=useState('Semua'),[levelFilter,setLevelFilter]=useState('Semua level'),[query,setQuery]=useState(''),[index,setIndex]=useState(0),[flipped,setFlipped]=useState(false),[showAdd,setShowAdd]=useState(false),[newWord,setNewWord]=useState({word:'',meaning:'',type:'Nomen',example:'',plural:'',past:'',chapter:'Freizeit'}),[quizIndex,setQuizIndex]=useState(0),[choice,setChoice]=useState(null),[quizScore,setQuizScore]=useState(0),[quizDone,setQuizDone]=useState(false),[listening,setListening]=useState(false),[mobileOpen,setMobileOpen]=useState(false);
- useEffect(()=>{localStorage.setItem('dz-words',JSON.stringify(words));},[words]);
+ useEffect(()=>{try{localStorage.setItem('dz-words',JSON.stringify(words));}catch(e){console.warn('Local vocabulary cache is full; cloud sync remains enabled.');}},[words]);
  useEffect(()=>{localStorage.setItem('dz-known',JSON.stringify(known));},[known]);
  useEffect(()=>{localStorage.setItem('dz-saved',JSON.stringify(saved));},[saved]);
  useEffect(()=>{if(!session?.user?.id)return;const timer=setTimeout(()=>{supabase.from('learning_data').upsert({user_id:session.user.id,words,known,saved,updated_at:new Date().toISOString()},{onConflict:'user_id'}).then(({error})=>{if(error)console.error('Cloud save failed:',error.message);});},700);return()=>clearTimeout(timer);},[session,words,known,saved]);
  const filtered=useMemo(()=>words.filter(w=>(filter==='Semua'||w.chapter===filter)&&(type==='Semua'||w.type===type)&&(levelFilter==='Semua level'||(w.level||'A2')===levelFilter)&&(`${w.word} ${w.meaning}`.toLowerCase().includes(query.toLowerCase()))),[words,filter,type,levelFilter,query]);
- const deck=filtered.length?filtered:words;const current=deck[index%deck.length];
+ const deck=filtered;const current=deck.length?deck[index%deck.length]:null;
+ const [grammarSearch,setGrammarSearch]=useState(''),[grammarLevel,setGrammarLevel]=useState('Semua'),[activeGrammar,setActiveGrammar]=useState(0),[practiceLevel,setPracticeLevel]=useState('Semua'),[practiceIndex,setPracticeIndex]=useState(0),[practiceAnswer,setPracticeAnswer]=useState(null),[practiceScore,setPracticeScore]=useState(0),[practiceDone,setPracticeDone]=useState(false),[importMessage,setImportMessage]=useState('');
+ const wordFileRef=useRef(null);
+ const grammarFiltered=grammarTopics.filter(g=>(grammarLevel==='Semua'||g.level===grammarLevel)&&(`${g.title} ${g.rule}`.toLowerCase().includes(grammarSearch.toLowerCase())));
+ const practiceDeck=exercises.filter(q=>practiceLevel==='Semua'||q.level===practiceLevel);const currentQuestion=practiceDeck[practiceIndex%Math.max(practiceDeck.length,1)];
+ const answerPractice=idx=>{if(practiceAnswer!==null)return;setPracticeAnswer(idx);if(idx===currentQuestion.a)setPracticeScore(v=>v+1);};
+ const nextPractice=()=>{if(practiceIndex===practiceDeck.length-1)setPracticeDone(true);else setPracticeIndex(v=>v+1);setPracticeAnswer(null);};
+ const restartPractice=()=>{setPracticeIndex(0);setPracticeAnswer(null);setPracticeScore(0);setPracticeDone(false);};
  const go=id=>{setPage(id);setMobileOpen(false)};
  const say=(text,rate=0.86)=>{if(!('speechSynthesis'in window))return;window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='de-DE';u.rate=rate;window.speechSynthesis.speak(u)};
  const addWord=()=>{if(!newWord.word.trim()||!newWord.meaning.trim())return;setWords([...words,{...newWord,id:Date.now()}]);setNewWord({word:'',meaning:'',type:'Nomen',example:'',plural:'',past:'',chapter:'Freizeit'});setShowAdd(false)};
